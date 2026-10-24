@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0f14">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>ASCII Cam Filter • Mobile & Desktop</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Alerta flutuante de contexto inseguro (caso o celular abra via HTTP) -->
+  <div id="insecureBanner" class="insecure-banner hidden">
+    <div class="banner-content">
+      <span class="banner-icon">🔒</span>
+      <div class="banner-text">
+        <strong>Acesso à câmera no celular requer HTTPS</strong>
+        <span>Toque abaixo para abrir na porta segura (HTTPS):</span>
+      </div>
+      <a id="httpsRedirectBtn" href="#" class="btn-banner">Abrir em HTTPS</a>
+    </div>
+  </div>
+
+  <!-- Flash de obturador para feedback fotográfico -->
+  <div id="shutterFlash" class="shutter-flash"></div>
+
+  <!-- Barra Superior / HUD -->
+  <header class="app-header" id="appHeader">
+    <div class="brand">
+      <div class="logo-icon">&gt;_</div>
+      <div class="brand-text">
+        <h1>ASCII Cam</h1>
+        <span class="subtitle">Canvas Filter</span>
+      </div>
+    </div>
+
+    <!-- Indicadores de Desempenho e Status -->
+    <div class="status-bar">
+      <div class="status-pill" id="statusPill">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Demo</span>
+      </div>
+      <div class="status-pill" id="fpsValue">0 FPS</div>
+      <div class="status-pill hide-mobile" id="resolutionValue">0×0</div>
+    </div>
+
+    <!-- Botões de Ação Rápida no Topo -->
+    <div class="header-actions">
+      <!-- Botão para abrir o QR Code / Conexão móvel (Desktop) -->
+      <button id="btnMobileConnect" class="icon-btn hide-mobile" title="Conectar Celular via Wi-Fi">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+      </button>
+
+      <!-- Botão de Inversão de Câmera (Frontal / Traseira) -->
+      <button id="btnFlipCameraTop" class="icon-btn" title="Alternar Câmera Frontal/Traseira">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 16v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4"/><path d="M4 8V4a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4"/><circle cx="12" cy="12" r="3"/><path d="M16 2v4"/><path d="M8 22v-4"/></svg>
+      </button>
+
+      <!-- Botão para abrir Painel de Configurações no Mobile -->
+      <button id="btnOpenSettings" class="icon-btn show-mobile-only" title="Configurações">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Estrutura Principal -->
+  <main class="app-container">
+    <!-- Viewport da Câmera / Canvas -->
+    <section class="canvas-viewport" id="canvasViewport">
+      <div class="canvas-box">
+        <canvas id="asciiCanvas"></canvas>
+        <div class="crt-overlay" id="crtOverlay"></div>
+      </div>
+
+      <!-- Dica flutuante para interação por toque -->
+      <div class="gesture-hint show-mobile-only" id="gestureHint">
+        Toque para tela cheia • Toque duplo para inverter câmera
+      </div>
+
+      <!-- Miniatura PiP (Picture-in-Picture) da Webcam Real -->
+      <div class="camera-preview-pip hidden" id="cameraPip">
+        <video id="webcamVideo" playsinline webkit-playsinline muted autoplay></video>
+        <div class="pip-label">Vídeo Real</div>
+      </div>
+    </section>
+
+    <!-- Barra de Ações Inferior no Mobile (Estilo Câmera Nativa) -->
+    <nav class="mobile-bottom-bar" id="mobileBottomBar">
+      <!-- Botão Rápido de Paleta / Filtro -->
+      <button id="btnQuickPalette" class="shutter-side-btn" title="Mudar Paleta de Cores">
+        <div class="palette-swatch-badge" id="paletteBadge"></div>
+        <span class="btn-caption">Cor</span>
+      </button>
+
+      <!-- Botão Principal do Obturador (Shutter) -->
+      <button id="btnShutter" class="shutter-btn" title="Capturar Foto PNG">
+        <div class="shutter-inner"></div>
+      </button>
+
+      <!-- Botão Copiar Texto ASCII -->
+      <button id="btnQuickCopy" class="shutter-side-btn" title="Copiar Texto ASCII">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <span class="btn-caption">Copiar</span>
+      </button>
+    </nav>
+
+    <!-- Gaveta de Configurações (Bottom Sheet no Mobile / Sidebar no Desktop) -->
+    <aside class="control-panel" id="controlPanel">
+      <div class="panel-header">
+        <h2>Ajustes & Filtros</h2>
+        <button id="btnClosePanel" class="icon-btn show-mobile-only" title="Fechar Ajustes">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="panel-scroll-area">
+        <!-- Seção: Entrada de Vídeo & Câmera -->
+        <div class="section">
+          <div class="section-title">
+            <span>Fonte de Imagem</span>
+          </div>
+          <div class="btn-group">
+            <button id="btnStartCamera" class="btn btn-primary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+              <span>Ligar Câmera</span>
+            </button>
+            <button id="btnToggleDemo" class="btn btn-secondary">
+              Modo Demo
+            </button>
+          </div>
+          <div class="btn-group">
+            <button id="btnFlipCamera" class="btn btn-secondary">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M16 2v4"/><path d="M8 22v-4"/></svg>
+              Inverter Câmera (Frontal/Traseira)
+            </button>
+          </div>
+        </div>
+
+        <!-- Seção: Amostragem & Caracteres -->
+        <div class="section">
+          <div class="section-title">
+            <span>Caracteres & Densidade</span>
+          </div>
+
+          <div class="control-group">
+            <label for="selectCharSet">Conjunto de Caracteres</label>
+            <select id="selectCharSet">
+              <option value="standard">Padrão (@%#*+=-:. )</option>
+              <option value="detailed">Detalhado (70 caracteres)</option>
+              <option value="blocks">Blocos de Densidade (█▓▒░ )</option>
+              <option value="matrix">Matrix Hacker (01XYZ#*+-. )</option>
+              <option value="binary">Binário (01 )</option>
+              <option value="minimal">Minimalista (#*+ )</option>
+              <option value="custom">Personalizado...</option>
+            </select>
+          </div>
+
+          <div class="control-group" id="customCharGroup" style="display: none;">
+            <label for="inputCustomChars">Caracteres Próprios (Escuro → Claro)</label>
+            <input type="text" id="inputCustomChars" value="@#*:. " placeholder="ex: @#*:. ">
+          </div>
+
+          <div class="control-group">
+            <label for="rangeCellSize">
+              <span>Resolução / Tamanho</span>
+              <span class="value-tag" id="cellSizeVal">10px</span>
+            </label>
+            <input type="range" id="rangeCellSize" min="6" max="26" value="10" step="1">
+            <div class="slider-labels">
+              <span>Mais Detalhes</span>
+              <span>Blocos Maiores</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Seção: Luminosidade & Imagem -->
+        <div class="section">
+          <div class="section-title">
+            <span>Cálculo de Luminosidade</span>
+          </div>
+
+          <div class="control-group">
+            <label for="selectFormula">Fórmula de Percepção</label>
+            <select id="selectFormula">
+              <option value="bt601" selected>BT.601 (0.299R + 0.587G + 0.114B)</option>
+              <option value="bt709">BT.709 HDTV (0.2126R + 0.7152G + 0.0722B)</option>
+              <option value="average">Média Simples ((R + G + B) / 3)</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <label for="rangeBrightness">
+              <span>Brilho</span>
+              <span class="value-tag" id="brightnessVal">0</span>
+            </label>
+            <input type="range" id="rangeBrightness" min="-100" max="100" value="0" step="5">
+          </div>
+
+          <div class="control-group">
+            <label for="rangeContrast">
+              <span>Contraste</span>
+              <span class="value-tag" id="contrastVal">0</span>
+            </label>
+            <input type="range" id="rangeContrast" min="-100" max="100" value="0" step="5">
+          </div>
+
+          <div class="switch-group">
+            <label for="checkInvert">Inverter Luminância</label>
+            <label class="switch">
+              <input type="checkbox" id="checkInvert" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Seção: Estilo & Paleta -->
+        <div class="section">
+          <div class="section-title">
+            <span>Paleta de Cores & Estilo</span>
+          </div>
+
+          <div class="control-group">
+            <label for="selectColor">Esquema de Cor</label>
+            <select id="selectColor">
+              <option value="green" selected>Verde Terminal (Matrix)</option>
+              <option value="amber">Âmbar Retrô (CRT)</option>
+              <option value="cyan">Ciano Cyberpunk</option>
+              <option value="white">Monocromático Branco</option>
+              <option value="truecolor">RGB Real (Cores da Câmera)</option>
+            </select>
+          </div>
+
+          <div class="color-presets">
+            <button class="color-btn active" data-color="green" style="background: #00ff66;" title="Verde"></button>
+            <button class="color-btn" data-color="amber" style="background: #ffb000;" title="Âmbar"></button>
+            <button class="color-btn" data-color="cyan" style="background: #00f0ff;" title="Ciano"></button>
+            <button class="color-btn" data-color="white" style="background: #ffffff;" title="Branco"></button>
+            <button class="color-btn" data-color="truecolor" style="background: linear-gradient(45deg, #ff0055, #00ff66, #0099ff);" title="Colorido RGB"></button>
+          </div>
+
+          <div class="switch-group">
+            <label for="checkMirror">Espelhar Horizontalmente</label>
+            <label class="switch">
+              <input type="checkbox" id="checkMirror" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="switch-group">
+            <label for="checkCrt">Efeito Linhas de Tubo (CRT)</label>
+            <label class="switch">
+              <input type="checkbox" id="checkCrt">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="switch-group">
+            <label for="checkPip">Miniatura de Vídeo Real</label>
+            <label class="switch">
+              <input type="checkbox" id="checkPip">
+              <span class="slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Seção: Exportação Desktop -->
+        <div class="section hide-mobile">
+          <div class="section-title">
+            <span>Exportar</span>
+          </div>
+          <div class="btn-group">
+            <button id="btnTakeSnapshot" class="btn btn-secondary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="4"/><path d="M5 7h1a2 2 0 0 0 2-2 1 1 0 0 1 1-1h6a1 1 0 0 1 1 1 2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"/></svg>
+              Salvar PNG
+            </button>
+            <button id="btnCopyText" class="btn btn-secondary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar ASCII
+            </button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Modal de Conexão com Celular (Desktop) -->
+  <div id="mobileConnectModal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>📲 Conectar Celular na Mesma Rede Wi-Fi</h3>
+        <button id="btnCloseModal" class="icon-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-lead">Escaneie o QR Code abaixo com a câmera do seu celular para abrir o app diretamente:</p>
+        
+        <div class="qr-container">
+          <img id="qrCodeImg" alt="QR Code para Celular" class="qr-image" />
+        </div>
+
+        <div class="qr-links">
+          <div class="link-item">
+            <span class="link-label">Link Seguro HTTPS (Recomendado):</span>
+            <a id="lanHttpsLink" href="#" target="_blank" class="code-link">Carregando...</a>
+          </div>
+          <div class="link-item">
+            <span class="link-label">Link Alternativo HTTP:</span>
+            <a id="lanHttpLink" href="#" target="_blank" class="code-link">Carregando...</a>
+          </div>
+        </div>
+
+        <div class="modal-hint">
+          <strong>ℹ️ Dica Importante:</strong> Ao abrir pelo link HTTPS no celular pela primeira vez, o navegador exibirá um aviso de certificado local. Basta tocar em <em>"Avançado"</em> e depois em <em>"Continuar / Prosseguir"</em>. Isso libera a câmera!
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast"></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

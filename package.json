@@ -1,0 +1,23 @@
+{
+  "name": "ascii-camera-canvas",
+  "version": "1.0.0",
+  "description": "Filtro de ASCII Art em tempo real usando a API Canvas e câmera do dispositivo",
+  "main": "index.html",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "stop": "taskkill /F /IM node.exe",
+    "serve:py": "python -m http.server 8080"
+  },
+  "keywords": [
+    "canvas",
+    "ascii-art",
+    "webrtc",
+    "camera",
+    "luminance",
+    "javascript"
+  ],
+  "author": "",
+  "license": "MIT"
+}
