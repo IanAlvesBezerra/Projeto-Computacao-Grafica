@@ -159,9 +159,10 @@ function printBanner(hasHttps) {
   console.log('       ASCII CAM FILTER - SERVIDOR LOCAL ATIVO 🚀              ');
   console.log('===============================================================');
   console.log('💻 No seu computador (navegador local):');
-  console.log(`   👉 http://localhost:${HTTP_PORT}`);
+  console.log(`   👉 App Principal:     http://localhost:${HTTP_PORT}`);
+  console.log(`   👉 Simulador WebRTC:  http://localhost:${HTTP_PORT}/test-webrtc-app.html`);
   if (hasHttps) {
-    console.log(`   👉 https://localhost:${HTTPS_PORT}`);
+    console.log(`   👉 HTTPS Local:       https://localhost:${HTTPS_PORT}`);
   }
 
   console.log('\n📱 No seu celular (conectado ao mesmo Wi-Fi):');

@@ -41,3 +41,19 @@ npm start
    - **Ícone de engrenagem (topo):** Abre a gaveta de ajustes avançados.
    - **Toque simples na tela:** Oculta/exibe os menus (modo tela cheia).
    - **Toque duplo na tela (ou botão no topo):** Alterna entre a câmera frontal e a traseira.
+
+
+---
+
+### 🧩 Extensão de Navegador (Middleware WebRTC — Chrome / Edge MV3)
+
+A pasta `extension/` contém a extensão **Manifest V3** que atua como um middleware de câmera para **Google Meet**, **Discord Web** e aplicações WebRTC:
+
+1. Abra o navegador (**Google Chrome** ou **Microsoft Edge**) e acesse:
+   - Chrome: `chrome://extensions/`
+   - Edge: `edge://extensions/`
+2. Ative a chave **Modo do desenvolvedor** (*Developer mode*).
+3. Clique em **Carregar sem compactação** (*Load unpacked*) e selecione a pasta **`extension/`** deste repositório.
+4. Para validar localmente a interceptação de `getUserMedia`, `enumerateDevices`, repasse de `AudioTrack`, troca de paletas/resolução ao vivo e desligamento limpo do hardware (`track.stop()`), inicie o servidor (`npm start`) e acesse:
+   - **`http://localhost:3000/test-webrtc-app.html`**
+5. Em chamadas no **Google Meet** (`https://meet.google.com`) ou **Discord Web** (`https://discord.com`), clique no ícone da extensão **ASCII Cam** na barra do navegador para ligar/desligar o filtro (modo *Bypass*) e alterar paletas, resolução e luminância ao vivo durante a chamada.

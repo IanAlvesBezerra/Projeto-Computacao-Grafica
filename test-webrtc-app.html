@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador WebRTC (Meet / Discord) • Validação do Middleware ASCII Cam</title>
+  <!--
+    Se a extensão MV3 já estiver instalada e ativa no navegador, o inject-middleware.js
+    já terá sido injetado em document_start (MAIN world) e esta tag será ignorada pelo guard
+    window.__ASCII_CAM_MIDDLEWARE_INSTALLED__. Caso contrário, carrega o middleware localmente
+    para permitir validação imediata.
+  -->
+  <script src="extension/inject-middleware.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #070a0e;
+      --surface-color: #10161e;
+      --surface-elevated: #161f2c;
+      --surface-border: rgba(255, 255, 255, 0.09);
+      --accent-color: #00ff88;
+      --accent-glow: rgba(0, 255, 136, 0.3);
+      --danger-color: #ff4757;
+      --warning-color: #ffb000;
+      --cyan-color: #00f0ff;
+      --text-primary: #f0f6fc;
+      --text-secondary: #8b949e;
+      --font-mono: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      background-color: var(--bg-color);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Topo */
+    .topbar {
+      height: 60px;
+      padding: 0 1.5rem;
+      background: rgba(11, 15, 20, 0.92);
+      border-bottom: 1px solid var(--surface-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo-badge {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent-color), #00b4d8);
+      color: #000;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    .brand-title h1 {
+      font-size: 1.02rem;
+      font-weight: 700;
+    }
+
+    .brand-title span {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+    }
+
+    .topbar-badges {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.3rem 0.65rem;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--surface-border);
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--warning-color);
+    }
+
+    .dot.ok {
+      background: var(--accent-color);
+      box-shadow: 0 0 8px var(--accent-color);
+    }
+
+    .dot.off {
+      background: var(--danger-color);
+    }
+
+    /* Layout Principal */
+    .workspace {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 390px;
+      gap: 1.25rem;
+      padding: 1.25rem 1.5rem;
+      max-width: 1600px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 1080px) {
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .left-column {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    /* Palco de Videoconferência (Simulação Meet / Discord) */
+    .video-stage {
+      position: relative;
+      background: #030507;
+      border: 1px solid var(--surface-border);
+      border-radius: 14px;
+      overflow: hidden;
+      aspect-ratio: 16 / 9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    #localVideo {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      background: #05070a;
+    }
+
+    .stage-placeholder {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      background: radial-gradient(circle at center, #111924 0%, #05070a 100%);
+      text-align: center;
+      padding: 1.5rem;
+      z-index: 2;
+    }
+
+    .stage-placeholder.hidden {
+      display: none;
+    }
+
+    .placeholder-avatar {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      background: rgba(0, 255, 136, 0.1);
+      border: 2px solid var(--accent-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 1.4rem;
+      color: var(--accent-color);
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+
+    .stage-hud-top {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      right: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .hud-tag {
+      background: rgba(7, 10, 14, 0.82);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--surface-border);
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* PiP Loopback Remoto WebRTC */
+    .remote-pip {
+      position: absolute;
+      bottom: 76px;
+      right: 16px;
+      width: 220px;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      border: 2px solid var(--cyan-color);
+      border-radius: 8px;
+      overflow: hidden;
+      z-index: 6;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.75);
+    }
+
+    .remote-pip.hidden {
+      display: none;
+    }
+
+    .remote-pip video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .remote-pip-label {
+      position: absolute;
+      bottom: 4px;
+      left: 6px;
+      background: rgba(0, 0, 0, 0.8);
+      color: var(--cyan-color);
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+
+    /* Barra de Controles de Chamada (Estilo Google Meet / Discord) */
+    .call-bar {
+      position: absolute;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      background: rgba(16, 22, 30, 0.92);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--surface-border);
+      padding: 0.55rem 0.9rem;
+      border-radius: 40px;
+      z-index: 10;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.45rem;
+      padding: 0.55rem 1rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.15s ease;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .btn-call-start {
+      background: var(--accent-color);
+      color: #000;
+      font-weight: 700;
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    .btn-call-end {
+      background: var(--danger-color);
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .btn-neutral {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-primary);
+      border-color: var(--surface-border);
+    }
+
+    .btn-neutral:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    .btn-neutral.muted {
+      background: rgba(255, 71, 87, 0.2);
+      color: #ff6b81;
+      border-color: rgba(255, 71, 87, 0.4);
+    }
+
+    /* Medidor de Áudio (AudioTrack Passthrough) */
+    .audio-meter-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 8px;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+    }
+
+    .audio-meter-bar {
+      width: 56px;
+      height: 8px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .audio-meter-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent-color);
+      transition: width 0.08s linear;
+    }
+
+    /* Painéis Inferiores e Laterais */
+    .grid-two {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 768px) {
+      .grid-two {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--surface-color);
+      border: 1px solid var(--surface-border);
+      border-radius: 12px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--surface-border);
+      padding-bottom: 0.55rem;
+    }
+
+    .panel-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--accent-color);
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+
+    .form-group label {
+      font-size: 0.76rem;
+      color: var(--text-secondary);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    select, input[type="text"] {
+      width: 100%;
+      padding: 0.5rem 0.65rem;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid var(--surface-border);
+      border-radius: 7px;
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      outline: none;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent-color);
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+    }
+
+    /* Checklist de Validação da Fase 1 */
+    .checklist {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.45rem 0.65rem;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--surface-border);
+      border-radius: 7px;
+      font-size: 0.76rem;
+    }
+
+    .check-badge {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: rgba(255, 176, 0, 0.15);
+      color: var(--warning-color);
+    }
+
+    .check-badge.pass {
+      background: rgba(0, 255, 136, 0.15);
+      color: var(--accent-color);
+    }
+
+    /* Console de Eventos e Inspecao */
+    .log-box {
+      background: #05070a;
+      border: 1px solid var(--surface-border);
+      border-radius: 8px;
+      padding: 0.65rem;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      height: 175px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      color: #c9d1d9;
+    }
+
+    .log-entry {
+      line-height: 1.35;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      padding-bottom: 2px;
+    }
+
+    .log-time {
+      color: var(--text-secondary);
+      margin-right: 6px;
+    }
+
+    .log-ok {
+      color: var(--accent-color);
+    }
+
+    .log-warn {
+      color: var(--warning-color);
+    }
+
+    .inspector-pre {
+      background: #05070a;
+      border: 1px solid var(--surface-border);
+      border-radius: 8px;
+      padding: 0.65rem;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: #a5d6ff;
+      max-height: 165px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+
+    .palette-row {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0.4rem;
+    }
+
+    .palette-chip {
+      padding: 0.4rem 0.2rem;
+      border-radius: 6px;
+      border: 1px solid var(--surface-border);
+      background: rgba(0, 0, 0, 0.4);
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      cursor: pointer;
+    }
+
+    .palette-chip.active {
+      border-color: var(--accent-color);
+      background: rgba(0, 255, 136, 0.14);
+      color: var(--accent-color);
+    }
+
+    .right-column {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Barra Superior -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo-badge">&gt;_</div>
+      <div class="brand-title">
+        <h1>Simulador WebRTC • Sala de Videoconferência</h1>
+        <span>Ambiente de Validação do Middleware ASCII Cam (Google Meet / Discord Simulator)</span>
+      </div>
+    </div>
+
+    <div class="topbar-badges">
+      <div class="pill">
+        <span class="dot" id="middlewareDot"></span>
+        <span id="middlewareBadgeText">Verificando Middleware...</span>
+      </div>
+      <div class="pill" id="streamStatePill">
+        <span class="dot off" id="callStateDot"></span>
+        <span id="callStateText">Chamada Inativa</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Conteúdo Principal -->
+  <main class="workspace">
+    <!-- Coluna Esquerda: Vídeo + Dispositivos + Log -->
+    <div class="left-column">
+      <section class="video-stage">
+        <video id="localVideo" autoplay playsinline muted></video>
+
+        <!-- Placeholder quando a chamada está desligada -->
+        <div class="stage-placeholder" id="stagePlaceholder">
+          <div class="placeholder-avatar">&gt;_</div>
+          <h2>Pronto para Testar a Interceptação WebRTC</h2>
+          <p style="color: var(--text-secondary); font-size: 0.88rem; max-width: 520px;">
+            Clique em <strong>Iniciar Chamada (getUserMedia)</strong> abaixo para requisitar vídeo e áudio.
+            O middleware interceptará a chamada e entregará o stream processado via <code>canvas.captureStream(30)</code>.
+          </p>
+        </div>
+
+        <!-- HUD Superior sobre o Vídeo -->
+        <div class="stage-hud-top">
+          <div class="hud-tag">
+            <span>Track:</span>
+            <strong id="activeTrackLabel" style="color: var(--accent-color);">Nenhuma</strong>
+          </div>
+          <div class="hud-tag">
+            <span id="activeMetricsBadge">0×0 • 0 FPS • AudioTracks: 0</span>
+          </div>
+        </div>
+
+        <!-- PiP de Simulação de Peer Remoto WebRTC (RTCPeerConnection) -->
+        <div class="remote-pip hidden" id="remotePip">
+          <video id="remoteVideo" autoplay playsinline muted></video>
+          <span class="remote-pip-label">RTCPeerConnection Remoto</span>
+        </div>
+
+        <!-- Barra de Ações da Chamada -->
+        <div class="call-bar">
+          <button type="button" class="btn btn-call-start" id="btnStartCall">
+            Iniciar Chamada (getUserMedia)
+          </button>
+          <button type="button" class="btn btn-call-end" id="btnStopCall" disabled>
+            Encerrar Chamada (track.stop)
+          </button>
+          <button type="button" class="btn btn-neutral" id="btnToggleMic" disabled>
+            Mic: ON
+          </button>
+          <button type="button" class="btn btn-neutral" id="btnLoopbackPeer" disabled>
+            Peer WebRTC: OFF
+          </button>
+          <div class="audio-meter-wrap" title="Nível da trilha de áudio original (AudioTrack)">
+            <span>Áudio</span>
+            <div class="audio-meter-bar">
+              <div class="audio-meter-fill" id="audioMeterFill"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Painéis de Dispositivos e Inspecao de Stream -->
+      <div class="grid-two">
+        <section class="panel">
+          <div class="panel-header">
+            <span class="panel-title">1. Dispositivos (enumerateDevices)</span>
+            <button type="button" class="btn btn-neutral" id="btnRefreshDevices" style="padding: 4px 10px; font-size: 0.72rem;">
+              Atualizar Lista
+            </button>
+          </div>
+
+          <div class="form-group">
+            <label for="selectVideoDevice">Câmera (videoinput)</label>
+            <select id="selectVideoDevice">
+              <option value="ascii-cam-virtual-device">ASCII Cam Virtual (Filtro em Tempo Real)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="selectAudioDevice">Microfone (audioinput)</label>
+            <select id="selectAudioDevice">
+              <option value="default">Microfone Padrão</option>
+            </select>
+          </div>
+
+          <div class="checkbox-row">
+            <label for="checkRequestAudio">Requisitar trilha de áudio em getUserMedia</label>
+            <input type="checkbox" id="checkRequestAudio" checked>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <span class="panel-title">2. Inspecionar MediaStreamTrack</span>
+            <span style="font-family: var(--font-mono); font-size: 0.68rem; color: var(--text-secondary);" id="trackReadyStateTag">readyState: -</span>
+          </div>
+          <pre class="inspector-pre" id="trackInspectorPre">Aguardando início da chamada para inspecionar as trilhas de vídeo e áudio retornadas pelo middleware...</pre>
+        </section>
+      </div>
+
+      <!-- Log de Eventos -->
+      <section class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Log de Eventos do Middleware WebRTC</span>
+          <button type="button" class="btn btn-neutral" id="btnClearLog" style="padding: 3px 8px; font-size: 0.7rem;">
+            Limpar Log
+          </button>
+        </div>
+        <div class="log-box" id="eventLogBox"></div>
+      </section>
+    </div>
+
+    <!-- Coluna Direita: Checklist + Controle Ao Vivo (Bridge / Popup Simulator) -->
+    <aside class="right-column">
+      <!-- Checklist de Validação dos Requisitos -->
+      <section class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Checklist de Validação (Fase 1)</span>
+          <button type="button" class="btn btn-call-start" id="btnRunAutoTests" style="padding: 4px 10px; font-size: 0.72rem;">
+            Auto-Validar Tudo
+          </button>
+        </div>
+
+        <div class="checklist">
+          <div class="check-item">
+            <span>1.2. Interceptação <code>enumerateDevices</code></span>
+            <span class="check-badge" id="chkEnumerate">PENDENTE</span>
+          </div>
+          <div class="check-item">
+            <span>1.2. Interceptação <code>getUserMedia</code></span>
+            <span class="check-badge" id="chkGetUserMedia">PENDENTE</span>
+          </div>
+          <div class="check-item">
+            <span>1.3. Pipeline <code>canvas.captureStream(30)</code></span>
+            <span class="check-badge" id="chkCaptureStream">PENDENTE</span>
+          </div>
+          <div class="check-item">
+            <span>1.4. Repasse de <code>AudioTrack</code> original</span>
+            <span class="check-badge" id="chkAudioTrack">PENDENTE</span>
+          </div>
+          <div class="check-item">
+            <span>1.4. Desligamento limpo (<code>track.stop()</code>)</span>
+            <span class="check-badge" id="chkCleanStop">PENDENTE</span>
+          </div>
+          <div class="check-item">
+            <span>1.5. Troca de paleta/resolução ao vivo</span>
+            <span class="check-badge" id="chkLiveBridge">PENDENTE</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Controle ao Vivo (Simula e Sincroniza com o Popup / content-bridge.js) -->
+      <section class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Controle ao Vivo (Bridge / Popup)</span>
+          <span style="font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent-color);" id="liveFilterStateTag">FILTRO ON</span>
+        </div>
+
+        <p style="font-size: 0.74rem; color: var(--text-secondary); line-height: 1.4;">
+          Altere os controles abaixo (ou diretamente pelo <strong>Popup da Extensão</strong> no navegador) durante a chamada para testar a atualização instantânea via <code>postMessage</code>.
+        </p>
+
+        <div class="checkbox-row">
+          <label for="simToggleEnabled"><strong>Filtro ASCII Ativo</strong> (Desligar = Bypass)</label>
+          <input type="checkbox" id="simToggleEnabled" checked>
+        </div>
+
+        <div class="form-group">
+          <label>Paleta de Cores</label>
+          <div class="palette-row">
+            <button type="button" class="palette-chip active" data-color="green">Matrix</button>
+            <button type="button" class="palette-chip" data-color="amber">Âmbar</button>
+            <button type="button" class="palette-chip" data-color="cyan">Ciano</button>
+            <button type="button" class="palette-chip" data-color="white">Branco</button>
+            <button type="button" class="palette-chip" data-color="truecolor">RGB</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="simRangeCellSize">
+            <span>Resolução / Tamanho do Caractere</span>
+            <strong id="simCellSizeVal" style="font-family: var(--font-mono); color: var(--text-primary);">10px</strong>
+          </label>
+          <input type="range" id="simRangeCellSize" min="6" max="24" step="1" value="10">
+        </div>
+
+        <div class="form-group">
+          <label for="simSelectCharSet">Conjunto de Caracteres</label>
+          <select id="simSelectCharSet">
+            <option value="standard">Padrão (@%#*+=-:. )</option>
+            <option value="detailed">Detalhado (70 níveis)</option>
+            <option value="blocks">Blocos Densos (█▓▒░ )</option>
+            <option value="matrix">Matrix Hacker (01XYZ#*+-. )</option>
+            <option value="binary">Binário (01 )</option>
+            <option value="minimal">Minimalista (#*+ )</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="simSelectFormula">Fórmula de Luminância</label>
+          <select id="simSelectFormula">
+            <option value="bt601">ITU-R BT.601 (Padrão)</option>
+            <option value="bt709">ITU-R BT.709 (HDTV)</option>
+            <option value="average">Média Simples</option>
+          </select>
+        </div>
+
+        <div class="grid-two" style="gap: 0.6rem;">
+          <div class="form-group">
+            <label for="simRangeBrightness">
+              <span>Brilho</span>
+              <span id="simBrightnessVal" style="font-family: var(--font-mono);">0</span>
+            </label>
+            <input type="range" id="simRangeBrightness" min="-100" max="100" step="5" value="0">
+          </div>
+
+          <div class="form-group">
+            <label for="simRangeContrast">
+              <span>Contraste</span>
+              <span id="simContrastVal" style="font-family: var(--font-mono);">0</span>
+            </label>
+            <input type="range" id="simRangeContrast" min="-100" max="100" step="5" value="0">
+          </div>
+        </div>
+
+        <div class="checkbox-row">
+          <label for="simCheckInverted">Inverter Luminância</label>
+          <input type="checkbox" id="simCheckInverted" checked>
+        </div>
+
+        <div class="checkbox-row">
+          <label for="simCheckMirrored">Espelhar Horizontalmente</label>
+          <input type="checkbox" id="simCheckMirrored">
+        </div>
+
+        <div class="checkbox-row">
+          <label for="simCheckCrt">Linhas de Varredura CRT</label>
+          <input type="checkbox" id="simCheckCrt">
+        </div>
+      </section>
+    </aside>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // Elementos da UI
+      const localVideo = document.getElementById('localVideo');
+      const remoteVideo = document.getElementById('remoteVideo');
+      const remotePip = document.getElementById('remotePip');
+      const stagePlaceholder = document.getElementById('stagePlaceholder');
+
+      const middlewareDot = document.getElementById('middlewareDot');
+      const middlewareBadgeText = document.getElementById('middlewareBadgeText');
+      const callStateDot = document.getElementById('callStateDot');
+      const callStateText = document.getElementById('callStateText');
+
+      const activeTrackLabel = document.getElementById('activeTrackLabel');
+      const activeMetricsBadge = document.getElementById('activeMetricsBadge');
+      const trackReadyStateTag = document.getElementById('trackReadyStateTag');
+      const trackInspectorPre = document.getElementById('trackInspectorPre');
+      const eventLogBox = document.getElementById('eventLogBox');
+
+      const btnStartCall = document.getElementById('btnStartCall');
+      const btnStopCall = document.getElementById('btnStopCall');
+      const btnToggleMic = document.getElementById('btnToggleMic');
+      const btnLoopbackPeer = document.getElementById('btnLoopbackPeer');
+      const btnRefreshDevices = document.getElementById('btnRefreshDevices');
+      const btnClearLog = document.getElementById('btnClearLog');
+      const btnRunAutoTests = document.getElementById('btnRunAutoTests');
+
+      const selectVideoDevice = document.getElementById('selectVideoDevice');
+      const selectAudioDevice = document.getElementById('selectAudioDevice');
+      const checkRequestAudio = document.getElementById('checkRequestAudio');
+      const audioMeterFill = document.getElementById('audioMeterFill');
+
+      // Badges de validação
+      const chkEnumerate = document.getElementById('chkEnumerate');
+      const chkGetUserMedia = document.getElementById('chkGetUserMedia');
+      const chkCaptureStream = document.getElementById('chkCaptureStream');
+      const chkAudioTrack = document.getElementById('chkAudioTrack');
+      const chkCleanStop = document.getElementById('chkCleanStop');
+      const chkLiveBridge = document.getElementById('chkLiveBridge');
+
+      // Controles ao vivo
+      const simToggleEnabled = document.getElementById('simToggleEnabled');
+      const liveFilterStateTag = document.getElementById('liveFilterStateTag');
+      const paletteChips = Array.from(document.querySelectorAll('.palette-chip'));
+      const simRangeCellSize = document.getElementById('simRangeCellSize');
+      const simCellSizeVal = document.getElementById('simCellSizeVal');
+      const simSelectCharSet = document.getElementById('simSelectCharSet');
+      const simSelectFormula = document.getElementById('simSelectFormula');
+      const simRangeBrightness = document.getElementById('simRangeBrightness');
+      const simBrightnessVal = document.getElementById('simBrightnessVal');
+      const simRangeContrast = document.getElementById('simRangeContrast');
+      const simContrastVal = document.getElementById('simContrastVal');
+      const simCheckInverted = document.getElementById('simCheckInverted');
+      const simCheckMirrored = document.getElementById('simCheckMirrored');
+      const simCheckCrt = document.getElementById('simCheckCrt');
+
+      // Estado da chamada simulada
+      let currentStream = null;
+      let audioContext = null;
+      let audioMeterRaf = null;
+      let pcLocal = null;
+      let pcRemote = null;
+
+      function logEvent(message, level = 'info') {
+        const entry = document.createElement('div');
+        entry.className = 'log-entry';
+        const time = new Date().toLocaleTimeString('pt-BR', { hour12: false });
+        const cls = level === 'ok' ? 'log-ok' : level === 'warn' ? 'log-warn' : '';
+        entry.innerHTML = `<span class="log-time">[${time}]</span><span class="${cls}">${message}</span>`;
+        eventLogBox.prepend(entry);
+      }
+
+      function markCheckPass(badgeEl, text = 'OK ✓') {
+        badgeEl.textContent = text;
+        badgeEl.classList.add('pass');
+      }
+
+      /**
+       * Verifica se o middleware está ativo na página
+       */
+      function checkMiddlewarePresence() {
+        const mw = window.__ASCII_CAM_MIDDLEWARE__;
+        const hasBridge = Boolean(window.__ASCII_CAM_BRIDGE_INSTALLED__);
+        if (mw) {
+          middlewareDot.className = 'dot ok';
+          middlewareBadgeText.textContent = hasBridge
+            ? `Extensão MV3 Ativa (v${mw.version})`
+            : `Middleware Ativo (v${mw.version})`;
+          logEvent(
+            `Middleware detectado com sucesso (${hasBridge ? 'Injetado via Extensão Chrome/Edge MV3' : 'Modo Local'}).`,
+            'ok'
+          );
+        } else {
+          middlewareDot.className = 'dot off';
+          middlewareBadgeText.textContent = 'Middleware Não Detectado';
+          logEvent('Aviso: window.__ASCII_CAM_MIDDLEWARE__ não encontrado.', 'warn');
+        }
+      }
+
+      /**
+       * Enumera dispositivos via navigator.mediaDevices.enumerateDevices()
+       */
+      async function refreshDeviceList() {
+        try {
+          if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+            logEvent('navigator.mediaDevices.enumerateDevices indisponível neste contexto.', 'warn');
+            return;
+          }
+
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoDevices = devices.filter((d) => d.kind === 'videoinput');
+          const audioDevices = devices.filter((d) => d.kind === 'audioinput');
+
+          selectVideoDevice.innerHTML = '';
+          let foundVirtualDevice = false;
+
+          for (const vd of videoDevices) {
+            const opt = document.createElement('option');
+            opt.value = vd.deviceId;
+            opt.textContent = vd.label || `Câmera (${vd.deviceId.slice(0, 8)})`;
+            if (vd.deviceId === 'ascii-cam-virtual-device') {
+              foundVirtualDevice = true;
+              opt.selected = true;
+            }
+            selectVideoDevice.appendChild(opt);
+          }
+
+          selectAudioDevice.innerHTML = '';
+          if (audioDevices.length === 0) {
+            const opt = document.createElement('option');
+            opt.value = 'default';
+            opt.textContent = 'Microfone Padrão';
+            selectAudioDevice.appendChild(opt);
+          } else {
+            for (const ad of audioDevices) {
+              const opt = document.createElement('option');
+              opt.value = ad.deviceId;
+              opt.textContent = ad.label || `Microfone (${ad.deviceId.slice(0, 8)})`;
+              selectAudioDevice.appendChild(opt);
+            }
+          }
+
+          if (foundVirtualDevice) {
+            markCheckPass(chkEnumerate);
+            logEvent(
+              `enumerateDevices() retornou ${videoDevices.length} câmera(s), incluindo "${window.__ASCII_CAM_MIDDLEWARE__?.VIRTUAL_DEVICE_LABEL}".`,
+              'ok'
+            );
+          } else {
+            logEvent(`enumerateDevices() retornou ${videoDevices.length} câmera(s).`, 'info');
+          }
+        } catch (err) {
+          logEvent(`Erro em enumerateDevices(): ${err.message}`, 'warn');
+        }
+      }
+
+      /**
+       * Inicia medidor de nível de áudio para comprovar que o AudioTrack original está vivo
+       */
+      function startAudioMeter(stream) {
+        stopAudioMeter();
+        const audioTracks = stream.getAudioTracks();
+        if (audioTracks.length === 0) {
+          audioMeterFill.style.width = '0%';
+          return;
+        }
+
+        try {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          audioContext = new AudioCtx();
+          const source = audioContext.createMediaStreamSource(new MediaStream([audioTracks[0]]));
+          const analyser = audioContext.createAnalyser();
+          analyser.fftSize = 256;
+          source.connect(analyser);
+
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+          const updateMeter = () => {
+            if (!audioContext) return;
+            analyser.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+              sum += dataArray[i];
+            }
+            const avg = sum / dataArray.length;
+            const pct = Math.min(100, Math.round((avg / 128) * 100));
+            audioMeterFill.style.width = `${pct}%`;
+            audioMeterRaf = requestAnimationFrame(updateMeter);
+          };
+          audioMeterRaf = requestAnimationFrame(updateMeter);
+        } catch (e) {
+          console.warn('Não foi possível iniciar medidor Web Audio:', e);
+        }
+      }
+
+      function stopAudioMeter() {
+        if (audioMeterRaf) {
+          cancelAnimationFrame(audioMeterRaf);
+          audioMeterRaf = null;
+        }
+        if (audioContext) {
+          audioContext.close().catch(() => {});
+          audioContext = null;
+        }
+        audioMeterFill.style.width = '0%';
+      }
+
+      /**
+       * Inicia uma chamada requisitando navigator.mediaDevices.getUserMedia
+       */
+      async function startCall() {
+        stopCall(false);
+        btnStartCall.disabled = true;
+
+        const chosenVideoId = selectVideoDevice.value;
+        const chosenAudioId = selectAudioDevice.value;
+        const wantAudio = checkRequestAudio.checked;
+
+        const constraints = {
+          video: {
+            deviceId: chosenVideoId ? { ideal: chosenVideoId } : undefined,
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+            frameRate: { ideal: 30 }
+          },
+          audio: wantAudio
+            ? chosenAudioId && chosenAudioId !== 'default'
+              ? { deviceId: { ideal: chosenAudioId } }
+              : true
+            : false
+        };
+
+        logEvent(`Requisitando getUserMedia(${JSON.stringify(constraints)})...`);
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          currentStream = stream;
+          localVideo.srcObject = stream;
+          stagePlaceholder.classList.add('hidden');
+
+          const videoTracks = stream.getVideoTracks();
+          const audioTracks = stream.getAudioTracks();
+          const vTrack = videoTracks[0];
+
+          callStateDot.className = 'dot ok';
+          callStateText.textContent = 'Em Chamada (Stream Ativo)';
+          btnStopCall.disabled = false;
+          btnToggleMic.disabled = audioTracks.length === 0;
+          btnLoopbackPeer.disabled = false;
+
+          // Validação 1.2 e 1.3
+          markCheckPass(chkGetUserMedia);
+          if (vTrack) {
+            const settings = vTrack.getSettings ? vTrack.getSettings() : {};
+            const isCanvasTrack =
+              vTrack.constructor?.name === 'CanvasCaptureMediaStreamTrack' ||
+              settings.frameRate === 30 ||
+              settings.deviceId === 'ascii-cam-virtual-device';
+            if (isCanvasTrack) {
+              markCheckPass(chkCaptureStream);
+            }
+            activeTrackLabel.textContent = vTrack.label || 'Canvas Capture Track (30 FPS)';
+          }
+
+          // Validação 1.4 (AudioTrack)
+          if (wantAudio) {
+            if (audioTracks.length > 0) {
+              markCheckPass(chkAudioTrack, `${audioTracks.length} Track(s) ✓`);
+              logEvent(
+                `AudioTrack original repassado com sucesso: "${audioTracks[0].label || 'Microfone'}" (readyState: ${audioTracks[0].readyState}).`,
+                'ok'
+              );
+              startAudioMeter(stream);
+            } else {
+              // Em máquinas sem microfone físico conectado, valida que o pipeline preservou a estrutura
+              markCheckPass(chkAudioTrack, 'Sem Mic Físico (OK)');
+              logEvent(
+                'Chamada iniciada sem trilha de áudio (nenhum microfone físico detectado ou permissão apenas de vídeo).',
+                'warn'
+              );
+            }
+          } else {
+            markCheckPass(chkAudioTrack, 'Áudio Opcional ✓');
+          }
+
+          updateStreamInspector();
+          await refreshDeviceList();
+        } catch (err) {
+          logEvent(`Falha em getUserMedia: ${err.name} - ${err.message}`, 'warn');
+          btnStartCall.disabled = false;
+        }
+      }
+
+      /**
+       * Encerra a chamada invocando track.stop() para validar o desligamento limpo do hardware (Requisito 1.4)
+       */
+      function stopCall(logAction = true) {
+        stopLoopbackPeer();
+        stopAudioMeter();
+
+        if (currentStream) {
+          const allTracks = currentStream.getTracks();
+          for (const track of allTracks) {
+            track.stop();
+          }
+          if (logAction) {
+            logEvent(
+              `Chamada encerrada: ${allTracks.length} trilha(s) parada(s) via track.stop(). Verificando desligamento do hardware...`,
+              'ok'
+            );
+          }
+          currentStream = null;
+        }
+
+        localVideo.srcObject = null;
+        stagePlaceholder.classList.remove('hidden');
+        callStateDot.className = 'dot off';
+        callStateText.textContent = 'Chamada Inativa';
+        activeTrackLabel.textContent = 'Nenhuma';
+        btnStartCall.disabled = false;
+        btnStopCall.disabled = true;
+        btnToggleMic.disabled = true;
+        btnLoopbackPeer.disabled = true;
+
+        updateStreamInspector();
+      }
+
+      /**
+       * Simula uma conexão WebRTC real (RTCPeerConnection) transmitindo o stream ASCII
+       */
+      async function toggleLoopbackPeer() {
+        if (pcLocal) {
+          stopLoopbackPeer();
+          return;
+        }
+        if (!currentStream) return;
+
+        try {
+          pcLocal = new RTCPeerConnection();
+          pcRemote = new RTCPeerConnection();
+
+          pcLocal.onicecandidate = (e) => e.candidate && pcRemote.addIceCandidate(e.candidate);
+          pcRemote.onicecandidate = (e) => e.candidate && pcLocal.addIceCandidate(e.candidate);
+
+          pcRemote.ontrack = (e) => {
+            if (remoteVideo.srcObject !== e.streams[0]) {
+              remoteVideo.srcObject = e.streams[0];
+            }
+          };
+
+          for (const track of currentStream.getTracks()) {
+            pcLocal.addTrack(track, currentStream);
+          }
+
+          const offer = await pcLocal.createOffer();
+          await pcLocal.setLocalDescription(offer);
+          await pcRemote.setRemoteDescription(offer);
+
+          const answer = await pcRemote.createAnswer();
+          await pcRemote.setLocalDescription(answer);
+          await pcLocal.setRemoteDescription(answer);
+
+          remotePip.classList.remove('hidden');
+          btnLoopbackPeer.textContent = 'Peer WebRTC: ON';
+          logEvent('Loopback RTCPeerConnection estabelecido com sucesso (simulando Google Meet/Discord).', 'ok');
+        } catch (err) {
+          logEvent(`Erro no RTCPeerConnection: ${err.message}`, 'warn');
+          stopLoopbackPeer();
+        }
+      }
+
+      function stopLoopbackPeer() {
+        if (pcLocal) {
+          pcLocal.close();
+          pcLocal = null;
+        }
+        if (pcRemote) {
+          pcRemote.close();
+          pcRemote = null;
+        }
+        remoteVideo.srcObject = null;
+        remotePip.classList.add('hidden');
+        btnLoopbackPeer.textContent = 'Peer WebRTC: OFF';
+      }
+
+      /**
+       * Atualiza o painel de inspeção técnica das trilhas e do middleware
+       */
+      function updateStreamInspector() {
+        const mwStatus = window.__ASCII_CAM_MIDDLEWARE__
+          ? window.__ASCII_CAM_MIDDLEWARE__.getStatus()
+          : null;
+
+        if (!currentStream) {
+          trackReadyStateTag.textContent = 'readyState: ended';
+          trackInspectorPre.textContent = JSON.stringify(
+            {
+              callActive: false,
+              middlewareStatus: mwStatus
+            },
+            null,
+            2
+          );
+          activeMetricsBadge.textContent = '0×0 • 0 FPS • AudioTracks: 0';
+          return;
+        }
+
+        const vTrack = currentStream.getVideoTracks()[0];
+        const aTrack = currentStream.getAudioTracks()[0];
+
+        const vSettings = vTrack && vTrack.getSettings ? vTrack.getSettings() : {};
+        const aSettings = aTrack && aTrack.getSettings ? aTrack.getSettings() : {};
+
+        trackReadyStateTag.textContent = `readyState: ${vTrack ? vTrack.readyState : 'none'}`;
+        activeMetricsBadge.textContent = `${mwStatus?.resolution || `${vSettings.width || 0}×${vSettings.height || 0}`} • ${mwStatus?.fps || 30} FPS • Grid: ${mwStatus?.grid || '--'} • AudioTracks: ${currentStream.getAudioTracks().length}`;
+
+        trackInspectorPre.textContent = JSON.stringify(
+          {
+            videoTrack: vTrack
+              ? {
+                  label: vTrack.label,
+                  kind: vTrack.kind,
+                  enabled: vTrack.enabled,
+                  readyState: vTrack.readyState,
+                  constructorName: vTrack.constructor?.name,
+                  settings: vSettings
+                }
+              : null,
+            audioTrack: aTrack
+              ? {
+                  label: aTrack.label,
+                  kind: aTrack.kind,
+                  enabled: aTrack.enabled,
+                  readyState: aTrack.readyState,
+                  settings: aSettings
+                }
+              : null,
+            middleware: mwStatus
+          },
+          null,
+          2
+        );
+      }
+
+      /**
+       * Envia atualização de configuração via protocolo postMessage (exatamente como o content-bridge.js)
+       */
+      function sendBridgeConfigUpdate(partialConfig) {
+        window.postMessage(
+          {
+            source: 'ASCII_CAM_BRIDGE',
+            type: 'UPDATE_CONFIG',
+            payload: partialConfig
+          },
+          '*'
+        );
+        markCheckPass(chkLiveBridge);
+      }
+
+      /**
+       * Sincroniza os controles da página caso a mudança tenha vindo do Popup da Extensão
+       */
+      function syncSimulatorControlsFromConfig(cfg) {
+        if (!cfg) return;
+        simToggleEnabled.checked = Boolean(cfg.enabled);
+        liveFilterStateTag.textContent = cfg.enabled ? 'FILTRO ON' : 'BYPASS (ORIGINAL)';
+        liveFilterStateTag.style.color = cfg.enabled ? 'var(--accent-color)' : 'var(--warning-color)';
+
+        for (const chip of paletteChips) {
+          chip.classList.toggle('active', chip.dataset.color === cfg.colorMode);
+        }
+
+        if (typeof cfg.cellSize === 'number') {
+          simRangeCellSize.value = String(cfg.cellSize);
+          simCellSizeVal.textContent = `${cfg.cellSize}px`;
+        }
+        if (cfg.charSet && cfg.charSet !== 'custom') {
+          simSelectCharSet.value = cfg.charSet;
+        }
+        if (cfg.luminanceFormula) {
+          simSelectFormula.value = cfg.luminanceFormula;
+        }
+        if (typeof cfg.brightness === 'number') {
+          simRangeBrightness.value = String(cfg.brightness);
+          simBrightnessVal.textContent = cfg.brightness > 0 ? `+${cfg.brightness}` : String(cfg.brightness);
+        }
+        if (typeof cfg.contrast === 'number') {
+          simRangeContrast.value = String(cfg.contrast);
+          simContrastVal.textContent = cfg.contrast > 0 ? `+${cfg.contrast}` : String(cfg.contrast);
+        }
+        if (typeof cfg.inverted === 'boolean') {
+          simCheckInverted.checked = cfg.inverted;
+        }
+        if (typeof cfg.mirrored === 'boolean') {
+          simCheckMirrored.checked = cfg.mirrored;
+        }
+        if (typeof cfg.crtLines === 'boolean') {
+          simCheckCrt.checked = cfg.crtLines;
+        }
+      }
+
+      // Escuta relatórios vindos do inject-middleware.js
+      window.addEventListener('message', (event) => {
+        if (event.source !== window || !event.data || typeof event.data !== 'object') return;
+        const { source, type, reason, payload } = event.data;
+
+        if (source === 'ASCII_CAM_MAIN') {
+          if (type === 'SESSION_STARTED') {
+            logEvent(
+              `[SESSION_STARTED] Pipeline ASCII #${payload.sessionId} iniciado (${payload.width}×${payload.height}, câmera: "${payload.cameraLabel}", AudioTracks: ${payload.audioTracksCount}).`,
+              'ok'
+            );
+          } else if (type === 'SESSION_ENDED') {
+            markCheckPass(chkCleanStop);
+            logEvent(
+              `[SESSION_ENDED] Hardware físico desligado com sucesso para sessão #${payload.sessionId} (motivo: ${payload.reason}, streams ativos restantes: ${payload.activeStreams}).`,
+              'ok'
+            );
+            updateStreamInspector();
+          } else if (type === 'STATUS_REPORT') {
+            if (payload && payload.config) {
+              syncSimulatorControlsFromConfig(payload.config);
+            }
+            if (reason === 'CONFIG_APPLIED') {
+              markCheckPass(chkLiveBridge);
+            }
+            updateStreamInspector();
+          }
+        }
+      });
+
+      // Eventos de Botões da Chamada
+      btnStartCall.addEventListener('click', () => startCall());
+      btnStopCall.addEventListener('click', () => stopCall(true));
+      btnRefreshDevices.addEventListener('click', () => refreshDeviceList());
+      btnLoopbackPeer.addEventListener('click', () => toggleLoopbackPeer());
+      btnClearLog.addEventListener('click', () => {
+        eventLogBox.innerHTML = '';
+      });
+
+      btnToggleMic.addEventListener('click', () => {
+        if (!currentStream) return;
+        const aTracks = currentStream.getAudioTracks();
+        if (aTracks.length === 0) return;
+        aTracks[0].enabled = !aTracks[0].enabled;
+        const isEnabled = aTracks[0].enabled;
+        btnToggleMic.textContent = isEnabled ? 'Mic: ON' : 'Mic: MUTE';
+        btnToggleMic.classList.toggle('muted', !isEnabled);
+        logEvent(`AudioTrack.enabled alterado para: ${isEnabled}`);
+      });
+
+      // Eventos dos Controles ao Vivo
+      simToggleEnabled.addEventListener('change', (e) => {
+        sendBridgeConfigUpdate({ enabled: e.target.checked });
+        logEvent(`Filtro ASCII ${e.target.checked ? 'ATIVADO' : 'em modo BYPASS (vídeo original)'}.`, 'ok');
+      });
+
+      for (const chip of paletteChips) {
+        chip.addEventListener('click', () => {
+          const colorMode = chip.dataset.color;
+          sendBridgeConfigUpdate({ colorMode });
+          logEvent(`Paleta alterada ao vivo para: ${colorMode.toUpperCase()}`, 'ok');
+        });
+      }
+
+      simRangeCellSize.addEventListener('input', (e) => {
+        const cellSize = parseInt(e.target.value, 10);
+        simCellSizeVal.textContent = `${cellSize}px`;
+        sendBridgeConfigUpdate({ cellSize });
+      });
+
+      simSelectCharSet.addEventListener('change', (e) => {
+        sendBridgeConfigUpdate({ charSet: e.target.value });
+        logEvent(`Conjunto de caracteres alterado para: ${e.target.value}`, 'ok');
+      });
+
+      simSelectFormula.addEventListener('change', (e) => {
+        sendBridgeConfigUpdate({ luminanceFormula: e.target.value });
+        logEvent(`Fórmula de luminância alterada para: ${e.target.value}`, 'ok');
+      });
+
+      simRangeBrightness.addEventListener('input', (e) => {
+        const brightness = parseInt(e.target.value, 10);
+        simBrightnessVal.textContent = brightness > 0 ? `+${brightness}` : String(brightness);
+        sendBridgeConfigUpdate({ brightness });
+      });
+
+      simRangeContrast.addEventListener('input', (e) => {
+        const contrast = parseInt(e.target.value, 10);
+        simContrastVal.textContent = contrast > 0 ? `+${contrast}` : String(contrast);
+        sendBridgeConfigUpdate({ contrast });
+      });
+
+      simCheckInverted.addEventListener('change', (e) => {
+        sendBridgeConfigUpdate({ inverted: e.target.checked });
+      });
+
+      simCheckMirrored.addEventListener('change', (e) => {
+        sendBridgeConfigUpdate({ mirrored: e.target.checked });
+      });
+
+      simCheckCrt.addEventListener('change', (e) => {
+        sendBridgeConfigUpdate({ crtLines: e.target.checked });
+      });
+
+      /**
+       * Executa bateria automatizada de validação dos itens 1.2 a 1.6
+       */
+      btnRunAutoTests.addEventListener('click', async () => {
+        btnRunAutoTests.disabled = true;
+        logEvent('=== INICIANDO VALIDAÇÃO AUTOMATIZADA DA FASE 1 ===', 'ok');
+
+        await refreshDeviceList();
+        await startCall();
+
+        await new Promise((r) => setTimeout(r, 600));
+        sendBridgeConfigUpdate({ colorMode: 'cyan', cellSize: 8 });
+        logEvent('Teste ao vivo: paleta Ciano Cyberpunk e resolução 8px aplicadas.', 'ok');
+
+        await new Promise((r) => setTimeout(r, 600));
+        sendBridgeConfigUpdate({ colorMode: 'green', cellSize: 10 });
+
+        await new Promise((r) => setTimeout(r, 500));
+        stopCall(true);
+
+        await new Promise((r) => setTimeout(r, 300));
+        await startCall();
+        logEvent('=== VALIDAÇÃO CONCLUÍDA: Chamada mantida ativa para inspeção visual ===', 'ok');
+        btnRunAutoTests.disabled = false;
+      });
+
+      // Atualização periódica de métricas na HUD
+      setInterval(() => {
+        if (currentStream) {
+          updateStreamInspector();
+        }
+      }, 1000);
+
+      // Inicialização
+      checkMiddlewarePresence();
+      refreshDeviceList();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASCII Cam Middleware</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <!-- Cabeçalho do Popup -->
+  <header class="popup-header">
+    <div class="brand">
+      <div class="logo-icon">&gt;_</div>
+      <div class="brand-info">
+        <h1>ASCII Cam</h1>
+        <span class="subtitle" id="hostBadge">Middleware WebRTC</span>
+      </div>
+    </div>
+
+    <!-- Chave Geral Liga/Desliga Filtro -->
+    <div class="master-toggle-wrap" title="Ligar ou desligar o filtro ASCII ao vivo na chamada">
+      <span class="master-label" id="masterStateLabel">ON</span>
+      <label class="switch">
+        <input type="checkbox" id="toggleEnabled" role="switch" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+  </header>
+
+  <!-- Barra de Telemetria da Chamada -->
+  <section class="telemetry-bar" id="telemetryBar">
+    <div class="telemetry-status">
+      <span class="status-dot" id="streamDot"></span>
+      <span id="streamStatusText">Aguardando chamada...</span>
+    </div>
+    <div class="telemetry-metrics">
+      <span class="metric-pill" id="fpsBadge">30 FPS</span>
+      <span class="metric-pill" id="gridBadge">--×--</span>
+    </div>
+  </section>
+
+  <!-- Conteúdo Principal de Controles -->
+  <main class="popup-body" id="controlsContainer">
+    <!-- Seção 1: Paleta de Cores Ao Vivo -->
+    <section class="card">
+      <div class="card-header">
+        <span class="card-title">Paleta de Cores</span>
+        <span class="value-badge" id="colorModeLabel">Matrix</span>
+      </div>
+
+      <div class="color-swatches" role="radiogroup" aria-label="Paleta de Cores">
+        <button type="button" class="swatch-btn active" data-color="green" title="Verde Terminal (Matrix)">
+          <span class="swatch- preview-green"></span>
+          <span class="swatch-name">Matrix</span>
+        </button>
+        <button type="button" class="swatch-btn" data-color="amber" title="Âmbar Retrô (CRT)">
+          <span class="swatch- preview-amber"></span>
+          <span class="swatch-name">Âmbar</span>
+        </button>
+        <button type="button" class="swatch-btn" data-color="cyan" title="Ciano Cyberpunk">
+          <span class="swatch- preview-cyan"></span>
+          <span class="swatch-name">Ciano</span>
+        </button>
+        <button type="button" class="swatch-btn" data-color="white" title="Monocromático Branco">
+          <span class="swatch- preview-white"></span>
+          <span class="swatch-name">Branco</span>
+        </button>
+        <button type="button" class="swatch-btn" data-color="truecolor" title="RGB Real (Cores da Câmera)">
+          <span class="swatch- preview-rgb"></span>
+          <span class="swatch-name">RGB</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Seção 2: Resolução & Caracteres -->
+    <section class="card">
+      <div class="card-header">
+        <span class="card-title">Resolução &amp; Densidade</span>
+        <span class="value-badge" id="cellSizeValue">10px</span>
+      </div>
+
+      <div class="control-row">
+        <input type="range" id="rangeCellSize" min="6" max="24" step="1" value="10" aria-label="Tamanho do Caractere">
+        <div class="range-hints">
+          <span>Alta Definição (6px)</span>
+          <span>Blocos (24px)</span>
+        </div>
+      </div>
+
+      <div class="control-row">
+        <label for="selectCharSet">Conjunto de Caracteres</label>
+        <select id="selectCharSet">
+          <option value="standard">Padrão (@%#*+=-:. )</option>
+          <option value="detailed">Detalhado (70 níveis)</option>
+          <option value="blocks">Blocos Densos (█▓▒░ )</option>
+          <option value="matrix">Matrix Hacker (01XYZ#*+-. )</option>
+          <option value="binary">Binário (01 )</option>
+          <option value="minimal">Minimalista (#*+ )</option>
+          <option value="custom">Personalizado...</option>
+        </select>
+      </div>
+
+      <div class="control-row hidden" id="customCharsRow">
+        <label for="inputCustomChars">Sequência Personalizada (Escuro → Claro)</label>
+        <input type="text" id="inputCustomChars" value="@#*:. " maxlength="64" placeholder="Ex: @#*:. ">
+      </div>
+    </section>
+
+    <!-- Seção 3: Luminância, Brilho e Contraste -->
+    <section class="card">
+      <div class="card-header">
+        <span class="card-title">Luminância &amp; Imagem</span>
+      </div>
+
+      <div class="control-row">
+        <label for="selectFormula">Fórmula de Luminância</label>
+        <select id="selectFormula">
+          <option value="bt601">ITU-R BT.601 (0.299R + 0.587G + 0.114B)</option>
+          <option value="bt709">ITU-R BT.709 HDTV (0.2126R + 0.7152G + 0.0722B)</option>
+          <option value="average">Média Simples ((R + G + B) / 3)</option>
+        </select>
+      </div>
+
+      <div class="dual-sliders">
+        <div class="control-row">
+          <div class="label-line">
+            <label for="rangeBrightness">Brilho</label>
+            <span class="value-badge" id="brightnessValue">0</span>
+          </div>
+          <input type="range" id="rangeBrightness" min="-100" max="100" step="5" value="0">
+        </div>
+
+        <div class="control-row">
+          <div class="label-line">
+            <label for="rangeContrast">Contraste</label>
+            <span class="value-badge" id="contrastValue">0</span>
+          </div>
+          <input type="range" id="rangeContrast" min="-100" max="100" step="5" value="0">
+        </div>
+      </div>
+
+      <div class="toggles-grid">
+        <div class="toggle-item">
+          <label for="checkInverted">Inverter Luz</label>
+          <label class="switch switch-sm">
+            <input type="checkbox" id="checkInverted" role="switch" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-item">
+          <label for="checkMirrored">Espelhar</label>
+          <label class="switch switch-sm">
+            <input type="checkbox" id="checkMirrored" role="switch">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-item">
+          <label for="checkCrt">Scanlines CRT</label>
+          <label class="switch switch-sm">
+            <input type="checkbox" id="checkCrt" role="switch">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Rodapé -->
+  <footer class="popup-footer">
+    <button type="button" id="btnResetDefaults" class="btn-reset" title="Restaurar configurações padrão">
+      Restaurar Padrão
+    </button>
+    <span class="footer-note" id="cameraNameNote">Pronto para Meet &amp; Discord</span>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>

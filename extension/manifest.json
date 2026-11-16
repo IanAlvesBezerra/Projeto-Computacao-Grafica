@@ -1,0 +1,89 @@
+{
+  "manifest_version": 3,
+  "name": "ASCII Cam Middleware — Filtro WebRTC",
+  "short_name": "ASCII Cam",
+  "version": "1.0.0",
+  "description": "Middleware de câmera WebRTC que intercepta getUserMedia e renderiza ASCII Art em tempo real a 30 FPS no Google Meet, Discord e apps web.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "ASCII Cam — Controle do Filtro em Tempo Real",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "permissions": [
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://meet.google.com/*",
+    "https://discord.com/*",
+    "https://*.discord.com/*",
+    "http://localhost/*",
+    "https://localhost/*",
+    "http://127.0.0.1/*",
+    "https://127.0.0.1/*",
+    "file:///*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://meet.google.com/*",
+        "https://discord.com/*",
+        "https://*.discord.com/*",
+        "http://localhost/*",
+        "https://localhost/*",
+        "http://127.0.0.1/*",
+        "https://127.0.0.1/*",
+        "file:///*"
+      ],
+      "js": [
+        "inject-middleware.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN",
+      "all_frames": true
+    },
+    {
+      "matches": [
+        "https://meet.google.com/*",
+        "https://discord.com/*",
+        "https://*.discord.com/*",
+        "http://localhost/*",
+        "https://localhost/*",
+        "http://127.0.0.1/*",
+        "https://127.0.0.1/*",
+        "file:///*"
+      ],
+      "js": [
+        "content-bridge.js"
+      ],
+      "run_at": "document_start",
+      "world": "ISOLATED",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "inject-middleware.js"
+      ],
+      "matches": [
+        "https://meet.google.com/*",
+        "https://discord.com/*",
+        "https://*.discord.com/*",
+        "http://localhost/*",
+        "https://localhost/*",
+        "http://127.0.0.1/*",
+        "https://127.0.0.1/*"
+      ]
+    }
+  ]
+}
